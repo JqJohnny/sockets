@@ -1,7 +1,11 @@
+import signal
 import socket
 import threading
+import os
 
 lock = threading.Lock()
+lockB = threading.Lock()
+server_id = -1
 
 
 def handle_client(client_socket, address):
@@ -20,6 +24,8 @@ def handle_client(client_socket, address):
 
 def server():
     lock.acquire()
+    global server_id
+    server_id = os.getpid()
     hostname = socket.gethostname()
     host = socket.gethostbyname(hostname)
     while True:
@@ -34,31 +40,49 @@ def server():
     lock.release()
 
     while True:
+        lockB.acquire()
         client_socket, addr = server_socket.accept()
         print(f"Accepted connection from {addr}")
+        lockB.release()
         client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
         client_handler.start()
 
 
 def client():
     lock.acquire()
-    host = input("Enter IP: ")
-    port = int(input("Enter port: "))
     lock.release()
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((host, port))
-
     while True:
-        message = input("Enter message: ")
-        if message.lower() == 'exit':
-            client_socket.send(message.encode('utf-8'))
-            break
-        elif message.lower() == 'disconnect':
+        command = input("Enter command: ")
+        split = command.split(' ')
+        if split[0] == 'connect':
+            host = split[1]
+            port = int(split[2])
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((host, port))
+            while True:
+                lockB.acquire()
+                message = input("Enter command: ")
+                message = message.split(' ', 1)
+                if message[0].lower() == 'exit':
+                    os.kill(server_id, signal.SIGINT)
+                elif message[0].lower() == 'disconnect':
+                    client_socket.close()
+                    lockB.release()
+                    break
+                elif message[0].lower() == 'send':
+                    client_socket.send(message[1].encode('utf-8'))
+                else:
+                    print("Invalid command.")
+                lockB.release()
             client_socket.close()
-            break
+        elif split[0] == 'exit':
+            os.kill(server_id, signal.SIGINT)
+        elif split[0] == 'disconnect':
+            print("Invalid. Haven't connected to a host yet.")
+        elif split[0].lower() == "send":
+            print("Invalid. Haven't connected to a host yet.")
         else:
-            client_socket.send(message.encode('utf-8'))
-    client_socket.close()
+            print("Invalid command.")
 
 
 if __name__ == "__main__":
@@ -66,8 +90,7 @@ if __name__ == "__main__":
     server_thread.start()
 
     client_thread = threading.Thread(target=client)
-    client_thread.start()
+    clients = client_thread.start()
 
     server_thread.join()
     client_thread.join()
-
