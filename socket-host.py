@@ -57,20 +57,20 @@ def client():
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((host, port))
             while True:
-                lockB.acquire()
                 message = input("Enter command: ")
                 message = message.split(' ', 1)
                 if message[0].lower() == 'exit':
                     os.kill(server_id, signal.SIGINT)
                 elif message[0].lower() == 'disconnect':
                     client_socket.close()
-                    lockB.release()
                     break
                 elif message[0].lower() == 'send':
-                    client_socket.send(message[1].encode('utf-8'))
+                    try:
+                        client_socket.send(message[1].encode('utf-8'))
+                    except IndexError:
+                        print("Invalid message.")
                 else:
                     print("Invalid command.")
-                lockB.release()
             client_socket.close()
         elif split[0] == 'exit':
             os.kill(server_id, signal.SIGINT)
