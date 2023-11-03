@@ -4,7 +4,6 @@ import threading
 import os
 
 lock = threading.Lock()
-lockB = threading.Lock()
 server_id = -1
 
 
@@ -40,10 +39,8 @@ def server():
     lock.release()
 
     while True:
-        lockB.acquire()
         client_socket, addr = server_socket.accept()
         print(f"Accepted connection from {addr}")
-        lockB.release()
         client_handler = threading.Thread(target=handle_client, args=(client_socket, addr))
         client_handler.start()
 
